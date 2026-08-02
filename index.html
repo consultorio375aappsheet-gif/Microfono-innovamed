@@ -366,7 +366,6 @@
       };
 
       recognition.onend = () => {
-        // Si el usuario no lo pausó manualmente, se reinicia automáticamente para mantener dictado continuo
         if (isListening) {
           recognition.start();
         } else {
@@ -383,7 +382,6 @@
 
     function startDictation() {
       if (recognition && !isListening) {
-        // Cargar texto previo si el usuario editó manualmente la casilla
         finalTranscript = document.getElementById('transcript-box').value;
         if (finalTranscript && !finalTranscript.endsWith(' ')) {
           finalTranscript += ' ';
@@ -427,10 +425,10 @@
       saveBtn.disabled = true;
       saveBtn.innerText = "Guardando...";
 
-      const appId = 'a3e3698a-46e6-4571-a0bd-0e510a8511f0';
-      const accessKey = 'V2-u0bT6-W34Ia-4wFIv-Oincz-ddxiG-bMLKB-jb3J7-J5WUl';
+      // CREDANCIALES ACTUALIZADAS
+      const appId = 'f34969f7-116c-4d6e-bd99-e8988bf64a10';
+      const accessKey = 'V2-glUCy-fR4MC-pZrWR-eJYyl-2C87z-ZiKdG-w6Kp1-7Ppep';
       
-      // Nombre exacto de tu nueva tabla
       const tableName = 'InformeMedico';
 
       const nuevoInformeId = "INF-" + Date.now();
@@ -441,7 +439,6 @@
       const anio = hoy.getFullYear();
       const fechaHoy = `${dia}/${mes}/${anio}`;
 
-      // Estructura exacta con las celdas de tu tabla InformeMedico
       const payload = {
         "Action": "Add",
         "Properties": {
@@ -482,7 +479,7 @@
         alert("Error de conexión: " + error.message);
       } finally {
         saveBtn.disabled = false;
-        saveBtn.innerText = "💾 Guardar Informe en AppSheet";
+        saveBtn.innerText = "💾 Guardar Resumen";
       }
     }  
   </script>
