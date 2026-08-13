@@ -61,21 +61,6 @@
       gap: 12px;
     }
 
-    /* Insignia Innova Med */
-    .innovamed-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      background-color: #f0f7ff;
-      border: 1px solid #bae6fd;
-      color: #0284c7;
-      padding: 4px 10px;
-      border-radius: 12px;
-      font-family: 'Arial', sans-serif;
-      font-size: 11px;
-      font-weight: bold;
-    }
-
     .clinic-info {
       text-align: right;
       font-family: 'Arial', sans-serif;
@@ -326,50 +311,42 @@
     var isListening = false;
     var restartTimer = null;
 
-    // Detección específica de Android
+    // Detectar si el dispositivo es Android
     var isAndroid = /Android/i.test(navigator.userAgent);
-
-    // Buffers de texto
-    var accumulatedText = ''; 
-    var lastInterimText = '';
 
     if (SpeechRecognition) {
       recognition = new SpeechRecognition();
       recognition.continuous = true;
-      recognition.interimResults = true;
       recognition.lang = 'es-ES';
 
+      // ⚠️ CLAVE PARA ANDROID: Desactivar resultados intermedios elimina los bucles y repeticiones.
+      // En iOS/PC se mantiene activo (true) para fluidez en tiempo real.
+      recognition.interimResults = !isAndroid;
+
       // ============================================================
-      // MÓDULO DE RECONOCIMIENTO DE VOZ (DIFERENCIADO PARA ANDROID)
+      // MANEJO EXCLUSIVO Y LIMPIO PARA ANDROID Y OTROS SISTEMAS
       // ============================================================
       recognition.onresult = function(event) {
         var box = document.getElementById('transcript-box');
 
         if (isAndroid) {
-          // --- LÓGICA EXCLUSIVA PARA ANDROID ---
-          var interim = '';
+          // Lógica Android: Capturamos únicamente frases finales completas
           for (var i = event.resultIndex; i < event.results.length; ++i) {
-            var speech = event.results[i][0].transcript;
             if (event.results[i].isFinal) {
-              // Si Android confirma la frase, se guarda permanentemente en la memoria
-              if (speech.trim() !== '' && !accumulatedText.endsWith(speech.trim())) {
-                accumulatedText += (accumulatedText ? ' ' : '') + speech.trim();
+              var newPhrase = event.results[i][0].transcript.trim();
+              if (newPhrase.length > 0) {
+                // Añadimos el nuevo texto al que ya está escrito en el textarea sin sobreescribir
+                var currentText = box.value.trim();
+                if (currentText.length > 0) {
+                  box.value = currentText + " " + newPhrase;
+                } else {
+                  box.value = newPhrase;
+                }
               }
-              lastInterimText = '';
-            } else {
-              interim += speech;
             }
           }
-          if (interim) {
-            lastInterimText = interim;
-          }
-
-          // Renderizado limpio: Texto acumulado fijo + Texto provisional en curso
-          var currentView = (accumulatedText + (lastInterimText ? ' ' + lastInterimText : '')).replace(/\s+/g, ' ');
-          box.value = currentView.trimStart();
-
         } else {
-          // --- LÓGICA PARA PC Y IPHONE ---
+          // Lógica PC / iPhone (Tiempo real)
           var finalText = '';
           var interimText = '';
           for (var i = 0; i < event.results.length; ++i) {
@@ -395,15 +372,6 @@
 
       recognition.onend = function() {
         if (isListening) {
-          // En Android, si hubo texto provisional al cortarse, lo aseguramos antes de reiniciar
-          if (isAndroid && lastInterimText.trim()) {
-            if (!accumulatedText.endsWith(lastInterimText.trim())) {
-              accumulatedText += (accumulatedText ? ' ' : '') + lastInterimText.trim();
-            }
-            lastInterimText = '';
-            document.getElementById('transcript-box').value = accumulatedText;
-          }
-
           clearTimeout(restartTimer);
           restartTimer = setTimeout(function() {
             if (isListening && recognition) {
@@ -425,10 +393,6 @@
 
     function startDictation() {
       if (recognition && !isListening) {
-        // Al iniciar, leemos lo que ya hay en la caja por si el usuario editó a mano
-        accumulatedText = document.getElementById('transcript-box').value.trim();
-        lastInterimText = '';
-
         isListening = true;
         try {
           recognition.start();
@@ -448,14 +412,6 @@
         isListening = false;
         clearTimeout(restartTimer);
         try { recognition.stop(); } catch (e) {}
-
-        if (isAndroid && lastInterimText.trim()) {
-          if (!accumulatedText.endsWith(lastInterimText.trim())) {
-            accumulatedText += (accumulatedText ? ' ' : '') + lastInterimText.trim();
-          }
-          lastInterimText = '';
-          document.getElementById('transcript-box').value = accumulatedText;
-        }
 
         var dot = document.getElementById('status-dot');
         if (dot) dot.classList.remove('active');
