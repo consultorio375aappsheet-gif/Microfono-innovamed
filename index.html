@@ -1,181 +1,415 @@
-<script>
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  let recognition;
-  let isListening = false;
-  let finalTranscript = '';
-  let restartTimer = null;
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dictado Continuo Consulta - DRA. ELIZABETH BALL DE PICÓN | Innova Med</title>
+  <style>
+    :root {
+      --primary-color: #932938;
+      --primary-hover: #751f2b;
+      --secondary-color: #2c3e50;
+      --bg-color: #eef2f5;
+      --card-bg: #ffffff;
+      --border-color: #d1d5db;
+    }
 
-  const statusDot = document.getElementById('status-dot');
-  const statusText = document.getElementById('status');
+    * {
+      box-sizing: border-box;
+    }
 
-  if (SpeechRecognition) {
-    recognition = new SpeechRecognition();
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.lang = 'es-ES';
+    body {
+      font-family: 'Georgia', 'Times New Roman', serif;
+      margin: 0;
+      padding: 20px 10px;
+      background-color: var(--bg-color);
+      color: #222;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
 
-    // MANEJO ROBUSTO PARA ANDROID Y OTROS SISTEMAS
-    recognition.onresult = (event) => {
-      let interimTranscript = '';
+    .sheet-container {
+      width: 100%;
+      max-width: 820px;
+      background: var(--card-bg);
+      padding: 40px 45px;
+      border-radius: 6px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.04);
+      border: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+    }
 
-      for (let i = event.resultIndex; i < event.results.length; ++i) {
-        if (event.results[i].isFinal) {
-          finalTranscript += event.results[i][0].transcript + ' ';
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2px solid var(--primary-color);
+      padding-bottom: 18px;
+      margin-bottom: 25px;
+      gap: 15px;
+      width: 100%;
+    }
+
+    .brand-logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .clinic-info {
+      text-align: right;
+      font-family: 'Arial', sans-serif;
+      font-size: 12px;
+      color: #444;
+      line-height: 1.4;
+    }
+
+    .clinic-info strong {
+      font-size: 14px;
+      color: var(--secondary-color);
+      display: block;
+      margin-bottom: 2px;
+    }
+
+    .document-title {
+      text-align: center;
+      font-size: 20px;
+      font-weight: bold;
+      color: var(--secondary-color);
+      margin-bottom: 20px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      width: 100%;
+    }
+
+    .status-container {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background-color: #f8fafc;
+      border: 1px solid #e2e8f0;
+      padding: 10px 18px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+      font-family: 'Arial', sans-serif;
+      font-size: 14px;
+      width: 100%;
+    }
+
+    .status-indicator {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 600;
+      color: #475569;
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background-color: #94a3b8;
+    }
+
+    .status-dot.active {
+      background-color: #10b981;
+      box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0% { opacity: 1; }
+      50% { opacity: 0.4; }
+      100% { opacity: 1; }
+    }
+
+    .controls {
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+      margin-bottom: 20px;
+      font-family: 'Arial', sans-serif;
+      width: 100%;
+    }
+
+    button {
+      padding: 12px 22px;
+      font-size: 14px;
+      font-family: 'Arial', sans-serif;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    #start-btn {
+      background-color: #10b981;
+      color: white;
+    }
+
+    #stop-btn {
+      background-color: #ef4444;
+      color: white;
+    }
+
+    #save-btn {
+      background-color: var(--primary-color);
+      color: white;
+      width: 100%;
+      margin-top: 20px;
+      padding: 15px;
+      font-size: 15px;
+      border-radius: 5px;
+    }
+
+    button:disabled {
+      background-color: #cbd5e1 !important;
+      color: #94a3b8 !important;
+      cursor: not-allowed;
+    }
+
+    textarea {
+      width: 100%;
+      height: 260px;
+      padding: 18px;
+      font-family: 'Georgia', 'Times New Roman', serif;
+      font-size: 16px;
+      color: #1e293b;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      background-color: #fafafa;
+      resize: vertical;
+      line-height: 1.6;
+    }
+
+    .footer-credits {
+      text-align: center;
+      font-family: 'Arial', sans-serif;
+      font-size: 11px;
+      color: #94a3b8;
+      margin-top: 15px;
+      width: 100%;
+    }
+
+    @media (max-width: 600px) {
+      .sheet-container { padding: 20px 18px; }
+      .header { flex-direction: column; text-align: center; }
+      .clinic-info { text-align: center; }
+      .controls { flex-direction: column; }
+      button { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="sheet-container">
+    <div class="header">
+      <div class="brand-logo">
+        <img src="https://lh3.googleusercontent.com/d/1Tlf8Sn2I2glfRitRd3sbaMan3A1WVaAU" 
+             alt="Innova Med Logo" 
+             style="height: 160px; width: auto; object-fit: contain;">
+      </div>
+      <div class="clinic-info">
+        <strong>CONSULTORIO MÉDICO DERMATOLÓGICO</strong>
+        DRA. ELIZABETH BALL DE PICÓN <br>
+        Caracas 
+      </div>
+    </div>
+
+    <div class="document-title">Dictado de Consulta Médica</div>
+
+    <div class="status-container">
+      <div class="status-indicator">
+        <div id="status-dot" class="status-dot"></div>
+        <span id="status">Estado: Detenido</span>
+      </div>
+      <span style="font-size: 12px; color: #64748b; font-family: sans-serif;">Dictado Inteligente IA</span>
+    </div>
+
+    <div class="controls">
+      <button id="start-btn" onclick="startDictation()">🎙️ Iniciar Escucha</button>
+      <button id="stop-btn" onclick="stopDictation()" disabled>⏹ Pausar</button>
+    </div>
+
+    <textarea id="transcript-box" placeholder="El texto dictado por la doctora aparecerá en esta sección..."></textarea>
+
+    <button id="save-btn" onclick="sendToAppSheet()">💾 Guardar Resumen</button>
+    
+    <div class="footer-credits">Innova Med Platform • Sistema de Asistencia Clínica</div>
+  </div>
+
+  <script>
+    var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    var recognition = null;
+    var isListening = false;
+    var finalTranscript = '';
+    var restartTimer = null;
+
+    if (SpeechRecognition) {
+      recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'es-ES';
+
+      recognition.onresult = function(event) {
+        var interimTranscript = '';
+        for (var i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            finalTranscript += event.results[i][0].transcript + ' ';
+          } else {
+            interimTranscript += event.results[i][0].transcript;
+          }
+        }
+        document.getElementById('transcript-box').value = finalTranscript + interimTranscript;
+      };
+
+      recognition.onerror = function(event) {
+        console.warn("Error Speech:", event.error);
+        if (event.error === 'no-speech' || event.error === 'aborted') {
+          return;
+        }
+        document.getElementById('status').innerText = "Error: " + event.error;
+        var dot = document.getElementById('status-dot');
+        if (dot) dot.classList.remove('active');
+      };
+
+      recognition.onend = function() {
+        if (isListening) {
+          clearTimeout(restartTimer);
+          restartTimer = setTimeout(function() {
+            if (isListening && recognition) {
+              try { recognition.start(); } catch (e) {}
+            }
+          }, 300);
         } else {
-          interimTranscript += event.results[i][0].transcript;
+          document.getElementById('status').innerText = "Estado: Pausado";
+          var dot = document.getElementById('status-dot');
+          if (dot) dot.classList.remove('active');
+          document.getElementById('start-btn').disabled = false;
+          document.getElementById('stop-btn').disabled = true;
+        }
+      };
+    } else {
+      alert("Tu navegador no soporta reconocimiento de voz nativo.");
+    }
+
+    function startDictation() {
+      if (recognition && !isListening) {
+        finalTranscript = document.getElementById('transcript-box').value;
+        if (finalTranscript && !finalTranscript.endsWith(' ')) {
+          finalTranscript += ' ';
+        }
+        isListening = true;
+        try {
+          recognition.start();
+          document.getElementById('status').innerText = "Estado: Escuchando...";
+          var dot = document.getElementById('status-dot');
+          if (dot) dot.classList.add('active');
+          document.getElementById('start-btn').disabled = true;
+          document.getElementById('stop-btn').disabled = false;
+        } catch (e) {
+          isListening = false;
         }
       }
+    }
 
-      document.getElementById('transcript-box').value = finalTranscript + interimTranscript;
-    };
-
-    recognition.onerror = (event) => {
-      console.warn("Evento Error SpeechRecognition:", event.error);
-      
-      // En Android 'no-speech' o 'aborted' suceden normalmente durante pausas
-      if (event.error === 'no-speech' || event.error === 'aborted') {
-        return; 
-      }
-
-      statusText.innerText = "Error: " + event.error;
-      if (statusDot) statusDot.classList.remove('active');
-    };
-
-    recognition.onend = () => {
-      // Si la doctora no presionó Pausar, intentamos reiniciar tras un pequeño delay (clave en Android)
-      if (isListening) {
+    function stopDictation() {
+      if (recognition && isListening) {
+        isListening = false;
         clearTimeout(restartTimer);
-        restartTimer = setTimeout(() => {
-          if (isListening && recognition) {
-            try {
-              recognition.start();
-            } catch (e) {
-              console.log("Reintento de inicio evitado:", e.message);
-            }
-          }
-        }, 300); // 300ms permite a Android liberar la interfaz de audio nativa
-      } else {
-        statusText.innerText = "Estado: Pausado";
-        if (statusDot) statusDot.classList.remove('active');
+        try { recognition.stop(); } catch (e) {}
+        var dot = document.getElementById('status-dot');
+        if (dot) dot.classList.remove('active');
+        document.getElementById('status').innerText = "Estado: Pausado";
         document.getElementById('start-btn').disabled = false;
         document.getElementById('stop-btn').disabled = true;
       }
-    };
+    }
 
-  } else {
-    alert("Tu navegador no soporta el reconocimiento de voz nativo (Web Speech API).");
-  }
+    async function sendToAppSheet() {
+      var saveBtn = document.getElementById('save-btn');
+      var text = document.getElementById('transcript-box').value;
 
-  function startDictation() {
-    if (SpeechRecognition && !isListening) {
-      // Recuperar el texto que ya exista en el cuadro por si pausó y continuó
-      finalTranscript = document.getElementById('transcript-box').value;
-      if (finalTranscript && !finalTranscript.endsWith(' ')) {
-        finalTranscript += ' ';
+      if (!text.trim()) {
+        alert("No hay texto dictado para enviar.");
+        return;
       }
-      
-      isListening = true;
-      try {
-        recognition.start();
-        statusText.innerText = "Estado: Escuchando...";
-        if (statusDot) statusDot.classList.add('active');
-        document.getElementById('start-btn').disabled = true;
-        document.getElementById('stop-btn').disabled = false;
-      } catch (e) {
-        console.error("No se pudo iniciar el dictado:", e);
-        isListening = false;
+
+      var urlParams = new URLSearchParams(window.location.search);
+      var idPaciente = urlParams.get('idPaciente') || urlParams.get('rowId');
+
+      if (!idPaciente) {
+        alert("Error: No se encontró el ID del paciente en la URL.");
+        return;
       }
-    }
-  }
 
-  function stopDictation() {
-    if (recognition && isListening) {
-      isListening = false;
-      clearTimeout(restartTimer);
-      try {
-        recognition.stop();
-      } catch (e) {}
-      if (statusDot) statusDot.classList.remove('active');
-      statusText.innerText = "Estado: Pausado";
-      document.getElementById('start-btn').disabled = false;
-      document.getElementById('stop-btn').disabled = true;
-    }
-  }
+      saveBtn.disabled = true;
+      saveBtn.innerText = "Guardando...";
 
-  // ENVÍO DE DATOS A APPSHEET
-  async function sendToAppSheet() {
-    const saveBtn = document.getElementById('save-btn');
-    const text = document.getElementById('transcript-box').value;
+      var appId = 'f34969f7-116c-4d6e-bd99-e8988bf64a10';
+      var accessKey = 'V2-glUCy-fR4MC-pZrWR-eJYyl-2C87z-ZiKdG-w6Kp1-7Ppep';
+      var tableName = 'InformeMedico';
 
-    if (!text.trim()) {
-      alert("No hay texto dictado para enviar.");
-      return;
-    }
+      var nuevoInformeId = "INF-" + Date.now();
+      var hoy = new Date();
+      var dia = String(hoy.getDate()).padStart(2, '0');
+      var mes = String(hoy.getMonth() + 1).padStart(2, '0');
+      var anio = hoy.getFullYear();
+      var fechaHoy = dia + '/' + mes + '/' + anio;
 
-    const urlParams = new URLSearchParams(window.location.search);
-    const idPaciente = urlParams.get('idPaciente') || urlParams.get('rowId');
-
-    if (!idPaciente) {
-      alert("Error: No se encontró el ID del paciente en la URL.");
-      return;
-    }
-
-    saveBtn.disabled = true;
-    saveBtn.innerText = "Guardando...";
-
-    const appId = 'f34969f7-116c-4d6e-bd99-e8988bf64a10';
-    const accessKey = 'V2-glUCy-fR4MC-pZrWR-eJYyl-2C87z-ZiKdG-w6Kp1-7Ppep';
-    const tableName = 'InformeMedico';
-
-    const nuevoInformeId = "INF-" + Date.now();
-    
-    const hoy = new Date();
-    const dia = String(hoy.getDate()).padStart(2, '0');
-    const mes = String(hoy.getMonth() + 1).padStart(2, '0');
-    const anio = hoy.getFullYear();
-    const fechaHoy = `${dia}/${mes}/${anio}`;
-
-    const payload = {
-      "Action": "Add",
-      "Properties": {
-        "Locale": "es-ES",
-        "Timezone": "UTC"
-      },
-      "Rows": [
-        {
-          "InformeMedID": nuevoInformeId,
-          "IDPaciente": decodeURIComponent(idPaciente).trim(),
-          "Fecha": fechaHoy,
-          "Transcripción": text.trim()
-        }
-      ]
-    };
-
-    const apiUrl = `https://api.appsheet.com/api/v2/apps/${appId}/tables/${tableName}/Action`;
-
-    try {
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'ApplicationAccessKey': accessKey,
-          'Content-Type': 'application/json'
+      var payload = {
+        "Action": "Add",
+        "Properties": {
+          "Locale": "es-ES",
+          "Timezone": "UTC"
         },
-        body: JSON.stringify(payload)
-      });
+        "Rows": [
+          {
+            "InformeMedID": nuevoInformeId,
+            "IDPaciente": decodeURIComponent(idPaciente).trim(),
+            "Fecha": fechaHoy,
+            "Transcripción": text.trim()
+          }
+        ]
+      };
 
-      const resText = await response.text();
+      var apiUrl = 'https://api.appsheet.com/api/v2/apps/' + appId + '/tables/' + tableName + '/Action';
 
-      if (response.ok) {
-        alert("¡Informe guardado con éxito en la tabla InformeMedico!");
-        try { window.close(); } catch(e) {}
-      } else {
-        alert(`Error de AppSheet (${response.status}): ${resText}`);
+      try {
+        var response = await fetch(apiUrl, {
+          method: 'POST',
+          headers: {
+            'ApplicationAccessKey': accessKey,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        });
+
+        var resText = await response.text();
+
+        if (response.ok) {
+          alert("¡Informe guardado con éxito en la tabla InformeMedico!");
+          try { window.close(); } catch(e) {}
+        } else {
+          alert("Error de AppSheet (" + response.status + "): " + resText);
+        }
+      } catch (error) {
+        alert("Error de conexión: " + error.message);
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.innerText = "💾 Guardar Resumen";
       }
-    } catch (error) {
-      alert("Error de conexión: " + error.message);
-    } finally {
-      saveBtn.disabled = false;
-      saveBtn.innerText = "💾 Guardar Resumen";
     }
-  } 
-</script>
+  </script>
+</body>
+</html>
