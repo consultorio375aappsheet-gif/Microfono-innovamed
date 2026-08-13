@@ -286,8 +286,6 @@
         <img src="https://lh3.googleusercontent.com/d/1Tlf8Sn2I2glfRitRd3sbaMan3A1WVaAU" 
              alt="Innova Med Logo" 
              style="height: 160px; width: auto; object-fit: contain;">
-        <div>
-        </div>
       </div>
       <div class="clinic-info">
         <strong>CONSULTORIO MÉDICO DERMATOLÓGICO</strong>
@@ -328,32 +326,65 @@
     var isListening = false;
     var restartTimer = null;
 
+    // Detección específica de Android
+    var isAndroid = /Android/i.test(navigator.userAgent);
+
+    // Buffers de texto
+    var accumulatedText = ''; 
+    var lastInterimText = '';
+
     if (SpeechRecognition) {
       recognition = new SpeechRecognition();
       recognition.continuous = true;
       recognition.interimResults = true;
       recognition.lang = 'es-ES';
 
-      // MANEJO DE RESULTADOS ANTI-DUPLICACIÓN (CORREGIDO PARA ANDROID, IOS Y PC)
+      // ============================================================
+      // MÓDULO DE RECONOCIMIENTO DE VOZ (DIFERENCIADO PARA ANDROID)
+      // ============================================================
       recognition.onresult = function(event) {
-        var finalText = '';
-        var interimText = '';
+        var box = document.getElementById('transcript-box');
 
-        // Recorremos siempre desde 0 para evitar que Android concatene buffers duplicados
-        for (var i = 0; i < event.results.length; ++i) {
-          if (event.results[i].isFinal) {
-            finalText += event.results[i][0].transcript + ' ';
-          } else {
-            interimText += event.results[i][0].transcript;
+        if (isAndroid) {
+          // --- LÓGICA EXCLUSIVA PARA ANDROID ---
+          var interim = '';
+          for (var i = event.resultIndex; i < event.results.length; ++i) {
+            var speech = event.results[i][0].transcript;
+            if (event.results[i].isFinal) {
+              // Si Android confirma la frase, se guarda permanentemente en la memoria
+              if (speech.trim() !== '' && !accumulatedText.endsWith(speech.trim())) {
+                accumulatedText += (accumulatedText ? ' ' : '') + speech.trim();
+              }
+              lastInterimText = '';
+            } else {
+              interim += speech;
+            }
           }
-        }
+          if (interim) {
+            lastInterimText = interim;
+          }
 
-        var fullText = (finalText + interimText).replace(/\s+/g, ' ');
-        document.getElementById('transcript-box').value = fullText.trimStart();
+          // Renderizado limpio: Texto acumulado fijo + Texto provisional en curso
+          var currentView = (accumulatedText + (lastInterimText ? ' ' + lastInterimText : '')).replace(/\s+/g, ' ');
+          box.value = currentView.trimStart();
+
+        } else {
+          // --- LÓGICA PARA PC Y IPHONE ---
+          var finalText = '';
+          var interimText = '';
+          for (var i = 0; i < event.results.length; ++i) {
+            if (event.results[i].isFinal) {
+              finalText += event.results[i][0].transcript + ' ';
+            } else {
+              interimText += event.results[i][0].transcript;
+            }
+          }
+          box.value = (finalText + interimText).replace(/\s+/g, ' ').trimStart();
+        }
       };
 
       recognition.onerror = function(event) {
-        console.warn("Error en reconocimiento de voz:", event.error);
+        console.warn("Error Speech:", event.error);
         if (event.error === 'no-speech' || event.error === 'aborted') {
           return;
         }
@@ -364,14 +395,21 @@
 
       recognition.onend = function() {
         if (isListening) {
+          // En Android, si hubo texto provisional al cortarse, lo aseguramos antes de reiniciar
+          if (isAndroid && lastInterimText.trim()) {
+            if (!accumulatedText.endsWith(lastInterimText.trim())) {
+              accumulatedText += (accumulatedText ? ' ' : '') + lastInterimText.trim();
+            }
+            lastInterimText = '';
+            document.getElementById('transcript-box').value = accumulatedText;
+          }
+
           clearTimeout(restartTimer);
           restartTimer = setTimeout(function() {
             if (isListening && recognition) {
-              try {
-                recognition.start();
-              } catch (e) {}
+              try { recognition.start(); } catch (e) {}
             }
-          }, 300); // Retardo seguro para que Android libere el micrófono
+          }, 300);
         } else {
           document.getElementById('status').innerText = "Estado: Pausado";
           var dot = document.getElementById('status-dot');
@@ -382,11 +420,15 @@
       };
 
     } else {
-      alert("Tu navegador no soporta el reconocimiento de voz nativo (Web Speech API).");
+      alert("Tu navegador no soporta el reconocimiento de voz nativo.");
     }
 
     function startDictation() {
       if (recognition && !isListening) {
+        // Al iniciar, leemos lo que ya hay en la caja por si el usuario editó a mano
+        accumulatedText = document.getElementById('transcript-box').value.trim();
+        lastInterimText = '';
+
         isListening = true;
         try {
           recognition.start();
@@ -405,9 +447,16 @@
       if (recognition && isListening) {
         isListening = false;
         clearTimeout(restartTimer);
-        try {
-          recognition.stop();
-        } catch (e) {}
+        try { recognition.stop(); } catch (e) {}
+
+        if (isAndroid && lastInterimText.trim()) {
+          if (!accumulatedText.endsWith(lastInterimText.trim())) {
+            accumulatedText += (accumulatedText ? ' ' : '') + lastInterimText.trim();
+          }
+          lastInterimText = '';
+          document.getElementById('transcript-box').value = accumulatedText;
+        }
+
         var dot = document.getElementById('status-dot');
         if (dot) dot.classList.remove('active');
         document.getElementById('status').innerText = "Estado: Pausado";
